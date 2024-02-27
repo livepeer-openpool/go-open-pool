@@ -1,0 +1,18 @@
+FROM ubuntu:22.04
+WORKDIR /root/
+# CLONE LP
+ENV GOOS=windows
+ENV GOARCH=amd64
+ENV DEBIAN_FRONTEND=noninteractive 
+ENV PATH=$PATH:/usr/local/go/bin
+ENV GO111MODULE=on
+ENV CGO_ENABLED=1
+ENV PKG_CONFIG_PATH=~/compiled/lib/pkgconfig
+ENV BUILD_TAGS=mainnet,experimental
+
+RUN apt-get update && apt-get upgrade -y && apt-get install -y binutils build-essential pkg-config nasm clang git make autoconf automake patch libtool texinfo zip wget mingw-w64 protobuf-compiler-grpc golang-goprotobuf-dev yasm mockgen
+RUN wget https://go.dev/dl/go1.21.6.linux-amd64.tar.gz
+RUN rm -rf /usr/local/go && tar -C /usr/local -xzf go1.21.6.linux-amd64.tar.gz
+COPY . .
+RUN ./install_ffmpeg.sh 
+RUN PKG_CONFIG_PATH=~/compiled/lib/pkgconfig make livepeer
