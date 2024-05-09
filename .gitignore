@@ -1,3 +1,4 @@
 livepeer.exe
-server/ot_rpc.go
-open-pool-x86_64.zip
+*.zip
+windows-binary/
+linux-binary/
