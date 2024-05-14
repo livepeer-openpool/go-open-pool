@@ -1465,6 +1465,7 @@ func (s *LivepeerServer) poolStatsHandler() http.Handler {
 		respondJson(w, poolStats)
 	})
 }
+// Open Pool
 func (s *LivepeerServer) transcodersHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 

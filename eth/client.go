@@ -121,6 +121,7 @@ type LivepeerEthClient interface {
 	SignTypedData(apitypes.TypedData) ([]byte, error)
 	SetGasInfo(uint64) error
 	SetMaxGasPrice(*big.Int) error
+	// Open Pool
 	SendEth(amount *big.Int, to ethcommon.Address) error
 }
 
@@ -1142,7 +1143,7 @@ func (c *client) Sign(msg []byte) ([]byte, error) {
 func (c *client) SignTypedData(typedData apitypes.TypedData) ([]byte, error) {
 	return c.accountManager.SignTypedData(typedData)
 }
-
+// Open Pool
 func (c *client) SendEth(amount *big.Int, to ethcommon.Address) error {
 	addr := c.Account().Address
 	glog.V(6).Infof("[SendEth] amount=%v to send from payer=%v to transcoder=%v ", amount, addr.Hex(), to.Hex())

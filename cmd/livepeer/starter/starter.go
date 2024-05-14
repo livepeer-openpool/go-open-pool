@@ -144,6 +144,7 @@ type LivepeerConfig struct {
 	AuthWebhookURL          *string
 	OrchWebhookURL          *string
 	OrchBlacklist           *string
+	OrchMinLivepeerVersion  *string
 	TestOrchAvail           *bool
 
 	TranscoderPool *bool
@@ -233,12 +234,14 @@ func DefaultLivepeerConfig() LivepeerConfig {
 	// API
 	defaultAuthWebhookURL := ""
 	defaultOrchWebhookURL := ""
-	// Open Pool
-	defaultTranscoderPool := false
-	defaultPoolCommission := 1
+	defaultMinLivepeerVersion := ""
 
 	// Flags
 	defaultTestOrchAvail := true
+
+	// Open Pool
+	defaultTranscoderPool := false
+	defaultPoolCommission := 1
 
 	return LivepeerConfig{
 		// Network & Addresses:
@@ -320,8 +323,9 @@ func DefaultLivepeerConfig() LivepeerConfig {
 		FVfailGsKey:    &defaultFVfailGsKey,
 
 		// API
-		AuthWebhookURL: &defaultAuthWebhookURL,
-		OrchWebhookURL: &defaultOrchWebhookURL,
+		AuthWebhookURL:         &defaultAuthWebhookURL,
+		OrchWebhookURL:         &defaultOrchWebhookURL,
+		OrchMinLivepeerVersion: &defaultMinLivepeerVersion,
 
 		// Flags
 		TestOrchAvail: &defaultTestOrchAvail,
@@ -1190,6 +1194,9 @@ func StartLivepeer(ctx context.Context, cfg LivepeerConfig) {
 	}
 
 	n.Capabilities = core.NewCapabilities(transcoderCaps, core.MandatoryOCapabilities())
+	if cfg.OrchMinLivepeerVersion != nil {
+		n.Capabilities.SetMinVersionConstraint(*cfg.OrchMinLivepeerVersion)
+	}
 
 	if drivers.NodeStorage == nil {
 		// base URI will be empty for broadcasters; that's OK
@@ -1277,13 +1284,15 @@ func StartLivepeer(ctx context.Context, cfg LivepeerConfig) {
 		if n.OrchSecret == "" {
 			glog.Exit("Missing -orchSecret")
 		}
+		// Open Pool
 		if *cfg.EthAcctAddr == "" {
 			glog.Fatal("Must provide an Ethereum address to receive payouts")
 		}
 		if len(orchURLs) <= 0 {
 			glog.Exit("Missing -orchAddr")
 		}
-
+		
+		//Open Pool
 		go server.RunTranscoder(n, orchURLs[0].Host, core.MaxSessions,transcoderCaps, ethcommon.HexToAddress(*cfg.EthAcctAddr))
 	}
 

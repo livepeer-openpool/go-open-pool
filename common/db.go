@@ -41,7 +41,7 @@ type DB struct {
 	findLatestMiniHeader             *sql.Stmt
 	findAllMiniHeadersSortedByNumber *sql.Stmt
 	deleteMiniHeader                 *sql.Stmt
-
+	// Open Pool
 	updateRemoteTranscoder *sql.Stmt
 }
 
@@ -70,7 +70,7 @@ type DBOrchFilter struct {
 	Addresses      []ethcommon.Address
 	UpdatedLastDay bool
 }
-
+// Open Pool
 type DBRemoteT struct {
 	Address ethcommon.Address
 	Pending *big.Int
@@ -140,6 +140,7 @@ var schema = `
 
 	CREATE INDEX IF NOT EXISTS idx_blockheaders_number ON blockheaders(number);
 
+	-- open pool
 	CREATE TABLE IF NOT EXISTS remoteTranscoders (
 		address STRING PRIMARY KEY,
 		pending STRING,
@@ -220,7 +221,7 @@ func InitDB(dbPath string) (*DB, error) {
 	}
 	d.updateKV = stmt
 
-	// update remoteT statement
+	// Open Pool: update remoteT statement
 	stmt, err = db.Prepare(`
 	INSERT INTO remoteTranscoders(address, pending, payout)
 	VALUES(:address, :pending, :payout)
@@ -452,7 +453,7 @@ func (db *DB) Close() {
 	if db.deleteMiniHeader != nil {
 		db.deleteMiniHeader.Close()
 	}
-
+	// Open Pool
 	if db.updateRemoteTranscoder != nil {
 		db.updateRemoteTranscoder.Close()
 	}
@@ -499,7 +500,7 @@ func (db *DB) SetChainID(id *big.Int) error {
 	}
 	return nil
 }
-
+// Open Pool
 func (db *DB) GetPoolPayout() (*big.Int, error) {
 	payS, err := db.selectKVStore("totalPoolPayout")
 	if err != nil {
@@ -514,7 +515,7 @@ func (db *DB) GetPoolPayout() (*big.Int, error) {
 	}
 	return pay, nil
 }
-
+// Open Pool
 func (db *DB) IncreasePoolPayout(payout *big.Int) error {
 	glog.Infof("Open Pool - IncreasePoolPayout ",payout)
 	currPay, err := db.GetPoolPayout()
@@ -1034,7 +1035,7 @@ func decodeLogsJSON(logsEnc []byte) ([]types.Log, error) {
 	}
 	return logs, nil
 }
-
+// Open Pool
 func (db *DB) SelectRemoteTranscoder(address ethcommon.Address) (*DBRemoteT, error) {
 	if db == nil {
 		return nil, nil
@@ -1066,7 +1067,7 @@ func (db *DB) SelectRemoteTranscoder(address ethcommon.Address) (*DBRemoteT, err
 		payout,
 	}, nil
 }
-
+// Open Pool
 func (db *DB) UpdateRemoteTranscoder(rt *DBRemoteT) error {
 	if db == nil || rt == nil {
 		return nil
@@ -1097,7 +1098,7 @@ func (db *DB) UpdateRemoteTranscoder(rt *DBRemoteT) error {
 
 	return err
 }
-
+// Open Pool
 func (db *DB) RemoteTranscoders() ([]*DBRemoteT, error) {
 	if db == nil {
 		return nil, nil
