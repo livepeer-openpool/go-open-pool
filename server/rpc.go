@@ -51,6 +51,7 @@ type Orchestrator interface {
 	VerifySig(ethcommon.Address, string, []byte) bool
 	CheckCapacity(core.ManifestID) error
 	TranscodeSeg(context.Context, *core.SegTranscodingMetadata, *stream.HLSSegment) (*core.TranscodeResult, error)
+	// Open Pool
 	ServeTranscoder(stream net.Transcoder_RegisterTranscoderServer, capacity int, capabilities *net.Capabilities, ethAddress ethcommon.Address)
 	TranscoderResults(job int64, res *core.RemoteTranscoderResult)
 	ProcessPayment(ctx context.Context, payment net.Payment, manifestID core.ManifestID) error
@@ -157,6 +158,8 @@ type lphttp struct {
 	orchRPC      *grpc.Server
 	transRPC     *http.ServeMux
 	node         *core.LivepeerNode
+	net.UnimplementedOrchestratorServer
+	net.UnimplementedTranscoderServer
 }
 
 func (h *lphttp) EndTranscodingSession(ctx context.Context, request *net.EndTranscodingSessionRequest) (*net.EndTranscodingSessionResponse, error) {
@@ -515,28 +518,6 @@ func coreSegMetadata(segData *net.SegData) (*core.SegTranscodingMetadata, error)
 		caps = core.NewCapabilities(nil, nil)
 	}
 
-	detectorProfs := []ffmpeg.DetectorProfile{}
-	for _, detector := range segData.DetectorProfiles {
-		var detectorProfile ffmpeg.DetectorProfile
-		// Refer to the following for type magic:
-		// https://developers.google.com/protocol-buffers/docs/reference/go-generated#oneof
-		switch x := detector.Value.(type) {
-		case *net.DetectorProfile_SceneClassification:
-			profile := x.SceneClassification
-			classes := []ffmpeg.DetectorClass{}
-			for _, class := range profile.Classes {
-				classes = append(classes, ffmpeg.DetectorClass{
-					ID:   int(class.ClassId),
-					Name: class.ClassName,
-				})
-			}
-			detectorProfile = &ffmpeg.SceneClassificationProfile{
-				SampleRate: uint(profile.SampleRate),
-				Classes:    classes,
-			}
-		}
-		detectorProfs = append(detectorProfs, detectorProfile)
-	}
 	var segPar core.SegmentParameters
 	segPar.ForceSessionReinit = segData.ForceSessionReinit
 	if segData.SegmentParameters != nil {
@@ -555,8 +536,6 @@ func coreSegMetadata(segData *net.SegData) (*core.SegTranscodingMetadata, error)
 		Duration:           dur,
 		Caps:               caps,
 		AuthToken:          segData.AuthToken,
-		DetectorEnabled:    segData.DetectorEnabled,
-		DetectorProfiles:   detectorProfs,
 		CalcPerceptualHash: segData.CalcPerceptualHash,
 		SegmentParameters:  &segPar,
 	}, nil

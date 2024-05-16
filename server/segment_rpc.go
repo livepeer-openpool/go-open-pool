@@ -36,6 +36,9 @@ const segmentHeader = "Livepeer-Segment"
 
 const pixelEstimateMultiplier = 1.02
 
+// Maximum price change allowed in orchestrator pricing before the session is swapped.
+var priceIncreaseThreshold = big.NewRat(2, 1)
+
 var errSegEncoding = errors.New("ErrorSegEncoding")
 var errSegSig = errors.New("ErrSegSig")
 var errFormat = errors.New("unrecognized profile output format")
@@ -232,9 +235,8 @@ func (h *lphttp) ServeSegment(w http.ResponseWriter, r *http.Request) {
 	} else {
 		result = net.TranscodeResult{Result: &net.TranscodeResult_Data{
 			Data: &net.TranscodeData{
-				Segments:   segments,
-				Sig:        res.Sig,
-				Detections: makeNetDetectData(res.TranscodeData.Detections),
+				Segments: segments,
+				Sig:      res.Sig,
 			}},
 		}
 	}
@@ -335,28 +337,6 @@ func makeFfmpegVideoProfiles(protoProfiles []*net.VideoProfile) ([]ffmpeg.VideoP
 		profiles = append(profiles, prof)
 	}
 	return profiles, nil
-}
-
-func makeNetDetectData(ffmpegDetectData []ffmpeg.DetectData) []*net.DetectData {
-	netDataList := []*net.DetectData{}
-	for _, data := range ffmpegDetectData {
-		var netData *net.DetectData
-		switch data.Type() {
-		case ffmpeg.SceneClassification:
-			d := data.(ffmpeg.SceneClassificationData)
-			netClasses := make(map[uint32]float64)
-			for classID, prob := range d {
-				netClasses[uint32(classID)] = prob
-			}
-			netData = &net.DetectData{Value: &net.DetectData_SceneClassification{
-				SceneClassification: &net.SceneClassificationData{
-					ClassProbs: netClasses,
-				},
-			}}
-		}
-		netDataList = append(netDataList, netData)
-	}
-	return netDataList
 }
 
 func verifySegCreds(ctx context.Context, orch Orchestrator, segCreds string, broadcaster ethcommon.Address) (*core.SegTranscodingMetadata, context.Context, error) {
@@ -647,15 +627,6 @@ func genSegCreds(sess *BroadcastSession, seg *stream.HLSSegment, segPar *core.Se
 		storage = core.ToNetOSInfo(bos.GetInfo())
 	}
 
-	detectorProfiles := []ffmpeg.DetectorProfile{}
-	detectorEnabled := false
-	if sess.Params.Detection.Freq != 0 {
-		detectorProfiles = sess.Params.Detection.Profiles
-		if seg.SeqNo%uint64(sess.Params.Detection.Freq) == 0 {
-			detectorEnabled = true
-		}
-	}
-
 	// Generate signature for relevant parts of segment
 	params := sess.Params
 	hash := crypto.Keccak256(seg.Data)
@@ -668,8 +639,6 @@ func genSegCreds(sess *BroadcastSession, seg *stream.HLSSegment, segPar *core.Se
 		Duration:           time.Duration(seg.Duration * float64(time.Second)),
 		Caps:               params.Capabilities,
 		AuthToken:          sess.OrchestratorInfo.GetAuthToken(),
-		DetectorEnabled:    detectorEnabled,
-		DetectorProfiles:   detectorProfiles,
 		CalcPerceptualHash: calcPerceptualHash,
 		SegmentParameters:  segPar,
 	}
@@ -860,13 +829,18 @@ func validatePrice(sess *BroadcastSession) error {
 		return errors.New("missing orchestrator price")
 	}
 
-	maxPrice := BroadcastCfg.MaxPrice()
-	if maxPrice != nil && oPrice.Cmp(maxPrice) == 1 {
-		return fmt.Errorf("Orchestrator price higher than the set maximum price of %v wei per %v pixels", maxPrice.Num().Int64(), maxPrice.Denom().Int64())
+	initPrice, err := common.RatPriceInfo(sess.InitialPrice)
+	if err != nil {
+		glog.Warningf("Error parsing session initial price (%d / %d): %v",
+			sess.InitialPrice.PricePerUnit, sess.InitialPrice.PixelsPerUnit, err)
 	}
-	iPrice, err := common.RatPriceInfo(sess.InitialPrice)
-	if err == nil && iPrice != nil && oPrice.Cmp(iPrice) == 1 {
-		return fmt.Errorf("Orchestrator price has changed, Orchestrator price: %v, Orchestrator initial price: %v", oPrice, iPrice)
+	if initPrice != nil {
+		// Prices are dynamic if configured with a custom currency, so we need to allow some change during the session.
+		// TODO: Make sure prices stay the same during a session so we can make this logic more strict, disallowing any price changes.
+		maxIncreasedPrice := new(big.Rat).Mul(initPrice, priceIncreaseThreshold)
+		if oPrice.Cmp(maxIncreasedPrice) > 0 {
+			return fmt.Errorf("Orchestrator price has more than doubled, Orchestrator price: %v, Orchestrator initial price: %v", oPrice.RatString(), initPrice.RatString())
+		}
 	}
 
 	return nil
