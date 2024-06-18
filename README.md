@@ -10,6 +10,8 @@
 [![license](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE.md)
 [![Contributions welcome](https://img.shields.io/badge/contributions-welcome-orange.svg?style=flat-square)](CONTRIBUTING.md)
 
+THIS PROJECT is derived from [Livepool](https://github.com/Livepool-io), as such all code is open-sourced and MIT license.
+
 The Livepeer project aims to deliver a live video-streaming network protocol
 that is fully decentralized, highly scalable and crypto-token incentivized to
 serve as the live media layer in the decentralized development (Web3) stack.
